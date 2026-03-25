@@ -59,6 +59,57 @@ curl -X POST http://127.0.0.1:8000/ask \
   -d '{"What travel preferences has Vikram Desai mentioned?"}'
 ```
 
+## Testing Examples
+
+These are a few example questions I ran locally against the service.
+
+- `What hotel preferences has Sophia Al-Farsi mentioned?`
+```json
+{
+  "answer": "Sophia Al-Farsi prefers hypoallergenic pillows and bedding, a fresh fruit basket upon check-in, and a park view room at the Ritz-Carlton.",
+  "confidence": 0.95,
+  "sources": [
+    "0485acf9-1920-4985-8e35-3cb04ae19b94",
+    "4d2cd313-ee86-4655-be5c-f05714fc6c9b",
+    "e8ebe88e-9453-4118-9e35-3d56f37ea80c"
+  ],
+  "metadata": {
+    "reasoning": "Sophia explicitly requested hypoallergenic bedding, fresh fruit baskets, and a park view room; these are the clearest hotel preferences mentioned."
+  }
+}
+```
+
+- `What did Armand Dupont request for future hotel stays?`
+```json
+{
+  "answer": "Armand Dupont requested to change his hotel to the Four Seasons for his upcoming Europe trip and to upgrade his hotel room to a suite with a balcony.",
+  "confidence": 0.95,
+  "sources": [
+    "7807bf91-ee32-49c9-9d17-de258c2006b6",
+    "e83cd9e3-2d86-4982-b04a-26929c8ea971"
+  ],
+  "metadata": {
+    "reasoning": "Armand explicitly requested the Four Seasons hotel change and a suite upgrade with balcony; these are the clearest future hotel stay requests."
+  }
+}
+```
+
+- `What is Hans Muller's favorite sushi restaurant in Tokyo?`
+```json
+{
+  "answer": "There is no information about Hans Muller's favorite sushi restaurant in Tokyo.",
+  "confidence": 1.0,
+  "sources": [
+    "0125e3a7-4f26-4c72-b0d9-a5c6d90fdcbe",
+    "61594211-b93d-43f6-a39e-f0cbbe3ea83c",
+    "2179bda1-ab65-4b59-94d2-1bd51dd19ecd"
+  ],
+  "metadata": {
+    "reasoning": "Hans Muller asked about sushi spots in Tokyo and planned a trip there, but no message states his favorite sushi restaurant."
+  }
+}
+```
+
 ## Production Readiness
 
 If this had to scale to 100,000 members with 10 years of history each, the first architectural change would be replacing periodic full-cache refreshes with an event-driven ingestion pipeline that incrementally updates a proper search layer, such as OpenSearch, Postgres full-text search, or a vector database. That would avoid repeatedly pulling the full dataset and would make retrieval much more selective and scalable.
