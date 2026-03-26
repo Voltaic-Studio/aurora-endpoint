@@ -111,7 +111,7 @@ These are a few example questions I ran locally against the service.
 
 ## Production Readiness
 
-If we needed to scale this to 100,000 members with a decade of history, the current in-memory TTL polling architecture would immediately bottleneck. The first architectural evolution would be:
+If we needed to scale this to 100,000 members with a decade of history, the current in-memory TTL polling architecture + the simple heuristic scorer would immediately bottleneck. (eg vs having embeddings) The first architectural evolution would be:
 
 - Replace the periodic full-cache refreshes with a webhook-based or streaming ingestion pipeline, so new upstream messages are pushed into the system asynchronously.
 - Instead of storing raw text in memory, asynchronously vectorize incoming messages with an embedding model like Gemini Embedding 2 and store them in a vector database like Pinecone or Postgres with `pgvector`.
