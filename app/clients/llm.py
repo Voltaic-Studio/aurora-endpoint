@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.schemas import AskResponse
-from app.utils.settings_defaults import LLM_MAX_COMPLETION_TOKENS, LLM_TEMPERATURE
+from app.utils.settings_defaults import LLM_TEMPERATURE
 
 
 class OpenRouterClient:
@@ -25,7 +25,7 @@ class OpenRouterClient:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
 
         system_prompt = """
-You are a retrieval-grounded QA system for concierge member history.
+You are a retrieval-grounded QA system for concierge member history only.
 
 Answer using ONLY the provided candidate messages.
 Do not use outside knowledge.
@@ -45,17 +45,20 @@ Return valid JSON with exactly this shape:
 Rules:
 1. Every claim must be supported by the candidate messages.
 2. "sources" must contain only message IDs from the provided context.
-3. Prefer the smallest set of facts needed to answer the question well.
-4. For broad questions, summarize only the most important supported points instead of listing everything.
+3. Prefer the most relevant supported facts for the question.
+4. Be concise, but not at the expense of useful supported detail.
 5. If evidence is weak, conflicting, or incomplete, say that clearly.
 6. If the answer cannot be determined, say so explicitly.
 7. Never fabricate preferences, bookings, relationships, dates, or personal details.
+8. If the question is about one user, keep the answer strictly about that user.
+9. Do not mention other users unless the question explicitly asks for a comparison.
 
 Style requirements:
-- Keep "answer" to 1 short sentence when possible, never more than 2 sentences.
-- Keep "answer" under 60 words.
+- Keep "answer" under 80 words.
 - Keep "metadata.reasoning" under 25 words.
-- Be concise and factual, not exhaustive.
+- Be concise and factual, but include additional relevant facts when they improve fidelity.
+- If the answer names the user, prefer the first name rather than repeating the full name unless the full name adds clarity.
+- If a fact would sound vague or awkward on its own, include enough nearby detail to make it clear and natural.
 - Do not use vague phrases like "these messages", "the retrieved evidence", or "the context".
 - In "metadata.reasoning", name the user and cite the concrete facts that support the answer.
 - Make "metadata.reasoning" read like a brief evidence trace, not a generic justification.
@@ -86,13 +89,15 @@ Instructions:
 - Identify the smallest set of messages needed to answer the question.
 - If no message supports the answer, return a no-data response.
 - If messages support multiple possible answers, return an ambiguous response.
-- Prefer a compact summary over an exhaustive list.
-- Mention only the strongest supported preferences or facts.
-- Keep the answer concise.
+- Keep the answer concise, but not at the expense of useful supported detail.
+- Include additional relevant facts when they improve fidelity to the user's question.
+- If a retrieved detail would be unclear by itself, add enough local context to make it understandable.
+- If the question is about one user, do not mention facts about any other user.
+- For no-data answers, explain only that the needed fact was not stated; do not pad with unrelated nearby evidence.
+- For questions asking about a specific preference, favorite, chain, or property, do not rely on indirect hints like a "usual hotel" reference unless it directly answers the question.
 - Keep reasoning brief but specific.
 - For reasoning, directly mention the user and the strongest supporting facts.
 - For reasoning, add a short selection trace such as why those facts were enough or why no stronger conflict appeared.
-- Example reasoning style: "Vikram explicitly requested an espresso machine in suites and a stocked wine cellar in holiday homes; those were the clearest retrieved preferences."
 - Return JSON only.
 """.strip()
 
@@ -100,10 +105,6 @@ Instructions:
             "Authorization": f"Bearer {self._settings.openrouter_api_key}",
             "Content-Type": "application/json",
         }
-        if self._settings.openrouter_site_url:
-            headers["HTTP-Referer"] = self._settings.openrouter_site_url
-        if self._settings.openrouter_app_name:
-            headers["X-Title"] = self._settings.openrouter_app_name
 
         response = await self._http_client.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -111,7 +112,6 @@ Instructions:
             json={
                 "model": self._settings.openrouter_model,
                 "temperature": LLM_TEMPERATURE,
-                "max_tokens": LLM_MAX_COMPLETION_TOKENS,
                 "response_format": {"type": "json_object"},
                 "messages": [
                     {"role": "system", "content": system_prompt},

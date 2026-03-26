@@ -65,46 +65,50 @@ These are a few example questions I ran locally against the service.
 - `What hotel preferences has Sophia Al-Farsi mentioned?`
 ```json
 {
-  "answer": "Sophia Al-Farsi prefers hypoallergenic pillows and bedding, a fresh fruit basket upon check-in, and a park view room at the Ritz-Carlton.",
-  "confidence": 0.95,
+  "answer": "Sophia Al-Farsi requires hypoallergenic pillows and bedding, a fresh fruit basket upon check-in, and a park view for her room at the Ritz-Carlton. She has also requested pet accommodations for her cat during a stay in Rome.",
+  "confidence": 1.0,
   "sources": [
     "0485acf9-1920-4985-8e35-3cb04ae19b94",
     "4d2cd313-ee86-4655-be5c-f05714fc6c9b",
-    "e8ebe88e-9453-4118-9e35-3d56f37ea80c"
+    "2d9ecdd3-7b09-45b2-8408-3f5a16ca48fd",
+    "e8ebe88e-9453-4118-9e35-3d56f37ea80c",
+    "528788e9-4f8b-4994-a7b8-22d5063af7e0"
   ],
   "metadata": {
-    "reasoning": "Sophia explicitly requested hypoallergenic bedding, fresh fruit baskets, and a park view room; these are the clearest hotel preferences mentioned."
+    "reasoning": "Sophia Al-Farsi explicitly requested hypoallergenic bedding, fruit baskets, park views, and cat accommodations across several messages."
   }
 }
 ```
 
-- `What did Armand Dupont request for future hotel stays?`
+- `What contact details has Vikram Desai asked Aurora to update?`
 ```json
 {
-  "answer": "Armand Dupont requested to change his hotel to the Four Seasons for his upcoming Europe trip and to upgrade his hotel room to a suite with a balcony.",
-  "confidence": 0.95,
-  "sources": [
-    "7807bf91-ee32-49c9-9d17-de258c2006b6",
-    "e83cd9e3-2d86-4982-b04a-26929c8ea971"
-  ],
-  "metadata": {
-    "reasoning": "Armand explicitly requested the Four Seasons hotel change and a suite upgrade with balcony; these are the clearest future hotel stay requests."
-  }
-}
-```
-
-- `What is Hans Muller's favorite sushi restaurant in Tokyo?`
-```json
-{
-  "answer": "There is no information about Hans Muller's favorite sushi restaurant in Tokyo.",
+  "answer": "Vikram Desai has requested updates for his contact number (+44-7901-234567), his primary contact number (5553219874), and his emergency contact (initially 555-111-2222, then updated to his assistant at 3322110099). He also asked to add executive membership details to his profile.",
   "confidence": 1.0,
   "sources": [
-    "0125e3a7-4f26-4c72-b0d9-a5c6d90fdcbe",
-    "61594211-b93d-43f6-a39e-f0cbbe3ea83c",
-    "2179bda1-ab65-4b59-94d2-1bd51dd19ecd"
+    "a431a55a-7e85-4efe-8d90-96ddc906e418",
+    "c0306413-3dc5-4378-a687-e079391a0c93",
+    "b993cff1-ea78-4ae6-b88e-0295982c31dc",
+    "19ad9ff0-6357-4140-bc0d-8dd76bb76cff",
+    "299bc291-3114-47c1-a481-1d10a5360847"
   ],
   "metadata": {
-    "reasoning": "Hans Muller asked about sushi spots in Tokyo and planned a trip there, but no message states his favorite sushi restaurant."
+    "reasoning": "Vikram provided specific phone numbers for primary and emergency contacts across multiple dates, plus a request for membership details."
+  }
+}
+```
+
+- `Which hotel brands or properties has Layla Kawaguchi mentioned preferring?`
+```json
+{
+  "answer": "Layla Kawaguchi requested to adjust her preferred hotel chain to Peninsula for her annual visits. She also specifically requested a suite facing Central Park at The Plaza Hotel in New York.",
+  "confidence": 1.0,
+  "sources": [
+    "6a559143-433d-4566-bb05-874d23448f27",
+    "e02050f0-0598-4400-9ff9-080c3f24dc54"
+  ],
+  "metadata": {
+    "reasoning": "Layla Kawaguchi explicitly named Peninsula as her preferred chain and requested a specific suite at The Plaza Hotel."
   }
 }
 ```
