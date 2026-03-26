@@ -43,7 +43,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `OPENROUTER_API_KEY` in `.env`. The cache/retrieval tuning now lives in code defaults, so the env file only needs secrets and optional model selection.
+Set `OPENROUTER_API_KEY` in `.env`. Everything else uses code defaults, so the env file only needs the API key.
 
 Then run:
 
@@ -112,4 +112,9 @@ These are a few example questions I ran locally against the service.
 
 ## Production Readiness
 
-If this had to scale to 100,000 members with 10 years of history each, the first architectural change would be replacing periodic full-cache refreshes with an event-driven ingestion pipeline that incrementally updates a proper search layer, such as OpenSearch, Postgres full-text search, or a vector database. That would avoid repeatedly pulling the full dataset and would make retrieval much more selective and scalable.
+If we needed to scale this to 100,000 members with a decade of history, the current in-memory TTL polling architecture would immediately bottleneck. The first architectural evolution would be:
+
+- Replace the periodic full-cache refreshes with a webhook-based or streaming ingestion pipeline, so new upstream messages are pushed into the system asynchronously.
+- Instead of storing raw text in memory, asynchronously vectorize incoming messages with an embedding model like Gemini Embedding 2 and store them in a vector database like Pinecone or Postgres with `pgvector`.
+- During `/ask`, perform hybrid search by combining semantic vector similarity with keyword matching, strictly filtered to that specific member's namespace.
+
