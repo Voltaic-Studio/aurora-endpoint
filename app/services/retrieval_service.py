@@ -2,16 +2,12 @@ from __future__ import annotations
 
 from collections import Counter
 
-from app.config import Settings
 from app.schemas import MessageRecord
 from app.utils.constants import BROAD_QUERY_TERMS, RETRIEVAL_STOPWORDS, TOKEN_RE
 from app.utils.settings_defaults import RETRIEVAL_BROAD_QUERY_TOP_K, RETRIEVAL_TOP_K
 
 
 class RetrievalService:
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-
     @property
     def top_k(self) -> int:
         return RETRIEVAL_TOP_K

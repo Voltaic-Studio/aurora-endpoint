@@ -40,7 +40,6 @@ app/
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
 Set `OPENROUTER_API_KEY` in `.env`. Everything else uses code defaults, so the env file only needs the API key.

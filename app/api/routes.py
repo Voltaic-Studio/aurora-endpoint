@@ -23,5 +23,3 @@ async def ask(request: Request, payload: AskRequest) -> AskResponse:
         return await qa_service.answer_question(payload.question)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Service is temporarily unavailable") from exc

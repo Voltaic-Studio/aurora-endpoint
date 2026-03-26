@@ -25,11 +25,7 @@ class MessageCacheService:
         self._last_refresh_error: str | None = None
 
     async def start(self) -> None:
-        try:
-            await self.refresh(force=True)
-        except Exception:
-            logger.exception("Initial cache warm-up failed")
-
+        await self.refresh(force=True)
         self._refresh_task = asyncio.create_task(self._refresh_loop())
 
     async def stop(self) -> None:
