@@ -2,6 +2,14 @@
 
 Question-answering service for Aurora's take-home assignment. It preloads the upstream `Messages API` into memory, retrieves the most relevant messages for a user question, and asks an LLM to produce a grounded structured answer.
 
+## Request - test it on openrouter or wherever (enter any query in body)
+```bash
+curl -X POST https://aurora-endpoint.onrender.com/ask \
+  -H "Content-Type: application/json" \
+  -d '{"What travel preferences has Vikram Desai mentioned?"}'
+```
+
+
 ## Architecture
 
 - `FastAPI` serves `POST /ask` and `GET /health`.
@@ -48,14 +56,6 @@ Then run:
 
 ```bash
 uvicorn app.main:app --reload
-```
-
-## Example Request
-
-```bash
-curl -X POST http://127.0.0.1:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"What travel preferences has Vikram Desai mentioned?"}'
 ```
 
 ## Testing Examples
