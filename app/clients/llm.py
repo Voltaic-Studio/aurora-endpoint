@@ -52,6 +52,11 @@ Rules:
 7. Never fabricate preferences, bookings, relationships, dates, or personal details.
 8. If the question is about one user, keep the answer strictly about that user.
 9. Do not mention other users unless the question explicitly asks for a comparison.
+10. Match the scope of the question exactly; do not add nearby facts that share only a location, city, category, or trip.
+11. For preference questions, prioritize explicit standing or recurring preferences over one-off requests or bookings.
+12. Do not turn isolated bookings, reservations, or logistics requests into general preferences unless the message explicitly frames them that way.
+13. If the evidence shows mixed or conflicting preferences, say that explicitly and lower confidence accordingly.
+14. For questions asking for a single favorite, exact property, exact brand, or exact restaurant, provide it only if it is explicitly named.
 
 Style requirements:
 - Keep "answer" under 80 words.
@@ -64,6 +69,10 @@ Style requirements:
 - Make "metadata.reasoning" read like a brief evidence trace, not a generic justification.
 - Do not make "metadata.reasoning" a paraphrase of the answer.
 - In "metadata.reasoning", explain why the cited messages were chosen or why they were sufficient.
+- When the question is narrow, keep the answer narrow.
+- For preference summaries, favor durable profile facts over incidental trip details.
+- If evidence is mixed, state the conflict rather than smoothing it over.
+- If an exact named item is not stated, say that it was not stated.
 
 Confidence guidance:
 - 0.90 to 1.00: directly supported by multiple consistent messages
@@ -95,6 +104,11 @@ Instructions:
 - If the question is about one user, do not mention facts about any other user.
 - For no-data answers, explain only that the needed fact was not stated; do not pad with unrelated nearby evidence.
 - For questions asking about a specific preference, favorite, chain, or property, do not rely on indirect hints like a "usual hotel" reference unless it directly answers the question.
+- For narrow questions, do not add adjacent facts just because they share the same city, hotel, restaurant, or trip.
+- For preference questions, separate durable preferences from one-off bookings; prefer durable preferences in the answer.
+- If a message sounds like a one-time request rather than an enduring preference, treat it as weaker evidence.
+- If the evidence is mixed or contradictory, say so directly instead of forcing one clean summary.
+- If the question asks for an exact named favorite, property, brand, or restaurant, return it only if the exact name is explicitly stated.
 - Keep reasoning brief but specific.
 - For reasoning, directly mention the user and the strongest supporting facts.
 - For reasoning, add a short selection trace such as why those facts were enough or why no stronger conflict appeared.

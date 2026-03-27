@@ -19,14 +19,11 @@ class QAService:
 
     async def answer_question(self, question: str) -> AskResponse:
         messages = await self._cache_service.get_messages()
-        scored_candidates = self._retrieval_service.retrieve_scored(question, messages)
-        if not scored_candidates:
+        candidates = self._retrieval_service.retrieve(question, messages)
+        if not candidates:
             return self._build_no_data_response(
                 reason="No retrieved messages contained meaningful overlap with the question."
             )
-
-        top_k = self._retrieval_service.top_k_for_question(question)
-        candidates = [message for _, message in scored_candidates[:top_k]]
         context = self._retrieval_service.build_context(candidates)
         candidate_ids = [message.id for message in candidates]
         candidate_id_set = set(candidate_ids)
