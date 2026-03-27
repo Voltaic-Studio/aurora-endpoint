@@ -9,6 +9,8 @@ curl -X POST https://aurora-endpoint.onrender.com/ask \
   -d '{"What travel preferences has Vikram Desai mentioned?"}'
 ```
 
+Or go on this simple interface i made https://aurora-endpoint.vercel.app/
+
 
 ## Architecture
 
