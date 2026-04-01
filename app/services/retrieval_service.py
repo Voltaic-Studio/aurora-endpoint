@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections import Counter
+import math
+import re
+import unicodedata
 
-from app.schemas import MessageRecord
-from app.utils.constants import BROAD_QUERY_TERMS, RETRIEVAL_STOPWORDS, TOKEN_RE
-from app.utils.settings_defaults import RETRIEVAL_BROAD_QUERY_TOP_K, RETRIEVAL_TOP_K
+from app.schemas import IndexedMessage, MessageRecord
+from app.utils.settings_defaults import RETRIEVAL_TOP_K, SEMANTIC_MIN_SIMILARITY
+
+NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 class RetrievalService:
@@ -12,78 +15,109 @@ class RetrievalService:
     def top_k(self) -> int:
         return RETRIEVAL_TOP_K
 
-    def top_k_for_question(self, question: str) -> int:
-        question_tokens = set(self._tokenize(question))
-        if question_tokens & BROAD_QUERY_TERMS:
-            return RETRIEVAL_BROAD_QUERY_TOP_K
-        return self.top_k
+    def resolve_member_scope(
+        self,
+        question: str,
+        messages_by_user_id: dict[str, list[IndexedMessage]],
+        user_names_by_id: dict[str, str],
+    ) -> tuple[str | None, list[IndexedMessage]]:
+        normalized_question = self._normalize_text(question)
+        if not normalized_question:
+            return None, []
 
-    def retrieve(self, question: str, messages: list[MessageRecord]) -> list[MessageRecord]:
-        scored_messages = self.retrieve_scored(question, messages)
-        top_messages = [message for _, message in scored_messages[: self.top_k_for_question(question)]]
+        alias_matches: list[tuple[int, str]] = []
+        for alias, user_id in self._build_alias_lookup(user_names_by_id).items():
+            if self._contains_alias(normalized_question, alias):
+                alias_matches.append((len(alias), user_id))
 
-        if top_messages:
-            return top_messages
+        if not alias_matches:
+            return None, [message for messages in messages_by_user_id.values() for message in messages]
 
-        return messages[: self.top_k_for_question(question)]
+        matched_user_ids = {user_id for _, user_id in alias_matches}
+        if len(matched_user_ids) != 1:
+            return None, [message for messages in messages_by_user_id.values() for message in messages]
 
-    def retrieve_scored(self, question: str, messages: list[MessageRecord]) -> list[tuple[float, MessageRecord]]:
-        question_tokens = self._tokenize(question)
-        if not question_tokens:
+        user_id = max(alias_matches, key=lambda item: item[0])[1]
+        return user_id, messages_by_user_id.get(user_id, [])
+
+    def retrieve_semantic(
+        self,
+        query_embedding: list[float],
+        candidates: list[IndexedMessage],
+    ) -> list[IndexedMessage]:
+        query_norm = math.sqrt(sum(value * value for value in query_embedding))
+        if query_norm == 0.0:
             return []
 
-        candidate_messages = self._filter_messages_by_user_name(question, messages)
-        scored_messages: list[tuple[float, MessageRecord]] = []
-        question_counts = Counter(question_tokens)
-        question_text = question.lower()
+        scored_messages: list[tuple[float, IndexedMessage]] = []
+        for candidate in candidates:
+            similarity = self._cosine_similarity(
+                left_embedding=query_embedding,
+                left_norm=query_norm,
+                right_embedding=candidate.embedding,
+                right_norm=candidate.embedding_norm,
+            )
+            if similarity >= SEMANTIC_MIN_SIMILARITY:
+                scored_messages.append((similarity, candidate))
 
-        for message in candidate_messages:
-            haystack = f"{message.user_name} {message.message}".lower()
-            message_tokens = self._tokenize(haystack)
-            if not message_tokens:
-                continue
-
-            message_counts = Counter(message_tokens)
-            overlap = sum(min(question_counts[token], message_counts[token]) for token in question_counts)
-            unique_overlap = len(set(question_tokens) & set(message_tokens))
-            phrase_bonus = 1.5 if message.user_name.lower() in question_text else 0.0
-            contains_question_fragment = 1.0 if any(token in haystack for token in question_tokens[:3]) else 0.0
-
-            score = (overlap * 2.0) + unique_overlap + phrase_bonus + contains_question_fragment
-            if score > 0:
-                scored_messages.append((score, message))
-
-        scored_messages.sort(key=lambda item: (-item[0], item[1].timestamp), reverse=False)
-        return scored_messages
+        scored_messages.sort(key=lambda item: (-item[0], item[1].record.timestamp), reverse=False)
+        return [candidate for _, candidate in scored_messages[: self.top_k]]
 
     @staticmethod
-    def _filter_messages_by_user_name(
-        question: str, messages: list[MessageRecord]
-    ) -> list[MessageRecord]:
-        question_text = question.lower()
-        matched_names = {
-            message.user_name
-            for message in messages
-            if message.user_name and message.user_name.lower() in question_text
-        }
-
-        if len(matched_names) != 1:
-            return messages
-
-        matched_name = next(iter(matched_names))
-        return [message for message in messages if message.user_name == matched_name]
-
-    @staticmethod
-    def build_context(messages: list[MessageRecord]) -> str:
+    def build_context(messages: list[IndexedMessage]) -> str:
         lines = []
         for message in messages:
+            record = message.record
             lines.append(
-                f"[{message.id}] {message.user_name} | {message.timestamp} | {message.message}"
+                f"[{record.id}] {record.user_name} | {record.timestamp} | {record.message}"
             )
         return "\n".join(lines)
 
     @staticmethod
-    def _tokenize(value: str) -> list[str]:
-        return [
-            token for token in TOKEN_RE.findall(value.lower()) if token not in RETRIEVAL_STOPWORDS
-        ]
+    def _build_alias_lookup(user_names_by_id: dict[str, str]) -> dict[str, str]:
+        alias_counts: dict[str, set[str]] = {}
+
+        for user_id, user_name in user_names_by_id.items():
+            normalized_name = RetrievalService._normalize_text(user_name)
+            if not normalized_name:
+                continue
+
+            aliases = {normalized_name}
+            name_parts = normalized_name.split()
+            if name_parts:
+                aliases.add(name_parts[0])
+                aliases.add(name_parts[-1])
+
+            for alias in aliases:
+                alias_counts.setdefault(alias, set()).add(user_id)
+
+        return {
+            alias: next(iter(user_ids))
+            for alias, user_ids in alias_counts.items()
+            if len(user_ids) == 1
+        }
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value)
+        ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+        collapsed = NORMALIZE_RE.sub(" ", ascii_value.lower()).strip()
+        return collapsed
+
+    @staticmethod
+    def _contains_alias(question: str, alias: str) -> bool:
+        return f" {alias} " in f" {question} "
+
+    @staticmethod
+    def _cosine_similarity(
+        left_embedding: list[float],
+        left_norm: float,
+        right_embedding: list[float],
+        right_norm: float,
+    ) -> float:
+        denominator = left_norm * right_norm
+        if denominator == 0.0:
+            return 0.0
+
+        dot_product = sum(left * right for left, right in zip(left_embedding, right_embedding, strict=True))
+        return dot_product / denominator

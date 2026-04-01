@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import httpx
@@ -7,7 +8,13 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.schemas import AskResponse
-from app.utils.settings_defaults import LLM_TEMPERATURE
+from app.utils.settings_defaults import (
+    EMBEDDING_BATCH_SIZE,
+    EMBEDDING_MAX_CONCURRENCY,
+    EMBEDDING_RETRIES,
+    EMBEDDING_RETRY_DELAY_SECONDS,
+    LLM_TEMPERATURE,
+)
 
 
 class OpenRouterClient:
@@ -15,15 +22,39 @@ class OpenRouterClient:
         self._http_client = http_client
         self._settings = settings
 
+    async def embed_text(self, value: str) -> list[float]:
+        embeddings = await self.embed_texts([value])
+        if not embeddings:
+            raise RuntimeError("Embedding request returned no vectors")
+        return embeddings[0]
+
+    async def embed_texts(self, values: list[str]) -> list[list[float]]:
+        if not values:
+            return []
+
+        semaphore = asyncio.Semaphore(EMBEDDING_MAX_CONCURRENCY)
+        tasks = [
+            self._embed_batch(
+                batch_index=batch_index,
+                batch_values=values[start : start + EMBEDDING_BATCH_SIZE],
+                semaphore=semaphore,
+            )
+            for batch_index, start in enumerate(range(0, len(values), EMBEDDING_BATCH_SIZE))
+        ]
+        ordered_batches = await asyncio.gather(*tasks)
+
+        embeddings: list[list[float]] = []
+        for _, batch_embeddings in sorted(ordered_batches, key=lambda item: item[0]):
+            embeddings.extend(batch_embeddings)
+
+        return embeddings
+
     async def answer_question(
         self,
         question: str,
         context: str,
         candidate_ids: list[str],
     ) -> AskResponse:
-        if not self._settings.openrouter_api_key:
-            raise RuntimeError("OPENROUTER_API_KEY is not configured")
-
         system_prompt = """
 You are a retrieval-grounded QA system for concierge member history only.
 
@@ -101,14 +132,9 @@ Instructions:
 - Return JSON only.
 """.strip()
 
-        headers = {
-            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
-            "Content-Type": "application/json",
-        }
-
         response = await self._http_client.post(
             "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
+            headers=self._build_headers(),
             json={
                 "model": self._settings.openrouter_model,
                 "temperature": LLM_TEMPERATURE,
@@ -137,6 +163,62 @@ Instructions:
         except (json.JSONDecodeError, ValidationError) as exc:
             raise ValueError("Model response did not match AskResponse schema") from exc
 
+    async def _embed_batch(
+        self,
+        batch_index: int,
+        batch_values: list[str],
+        semaphore: asyncio.Semaphore,
+    ) -> tuple[int, list[list[float]]]:
+        attempts = EMBEDDING_RETRIES + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                async with semaphore:
+                    response = await self._http_client.post(
+                        "https://openrouter.ai/api/v1/embeddings",
+                        headers=self._build_headers(),
+                        json={
+                            "model": self._settings.openrouter_embedding_model,
+                            "input": batch_values,
+                            "encoding_format": "float",
+                        },
+                    )
+
+                if response.is_error:
+                    message = self._extract_error_message(response)
+                    raise RuntimeError(
+                        f"OpenRouter embeddings request failed with status {response.status_code}: {message}"
+                    )
+
+                payload = response.json()
+                rows = payload.get("data")
+                if not isinstance(rows, list):
+                    raise ValueError("Embedding response did not contain a data list")
+
+                embeddings: list[list[float]] = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        raise ValueError("Embedding response row was not an object")
+
+                    embedding = row.get("embedding")
+                    if not isinstance(embedding, list) or not embedding:
+                        raise ValueError("Embedding response row did not contain a valid embedding")
+
+                    if not all(isinstance(value, (int, float)) for value in embedding):
+                        raise ValueError("Embedding response contained non-numeric values")
+
+                    embeddings.append([float(value) for value in embedding])
+
+                if len(embeddings) != len(batch_values):
+                    raise ValueError("Embedding response length did not match request length")
+
+                return batch_index, embeddings
+            except (httpx.HTTPError, RuntimeError):
+                if attempt == attempts:
+                    raise
+                await asyncio.sleep(EMBEDDING_RETRY_DELAY_SECONDS * attempt)
+
+        raise RuntimeError("Embedding batch retries exhausted")
+
     @staticmethod
     def _extract_error_message(response: httpx.Response) -> str:
         try:
@@ -151,3 +233,12 @@ Instructions:
                 return message
 
         return response.text or "Unknown OpenRouter error"
+
+    def _build_headers(self) -> dict[str, str]:
+        if not self._settings.openrouter_api_key:
+            raise RuntimeError("OPENROUTER_API_KEY is not configured")
+
+        return {
+            "Authorization": f"Bearer {self._settings.openrouter_api_key}",
+            "Content-Type": "application/json",
+        }

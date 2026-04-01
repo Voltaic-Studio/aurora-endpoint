@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from pydantic import BaseModel, Field
 
 
@@ -27,3 +29,19 @@ class AskResponse(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     sources: list[str]
     metadata: AskMetadata
+
+
+@dataclass(frozen=True)
+class IndexedMessage:
+    record: MessageRecord
+    embedding: list[float]
+    embedding_norm: float
+
+
+@dataclass(frozen=True)
+class CachedMessageIndex:
+    items: list[MessageRecord]
+    indexed_items: list[IndexedMessage]
+    messages_by_user_id: dict[str, list[IndexedMessage]]
+    user_names_by_id: dict[str, str]
+    updated_at: str

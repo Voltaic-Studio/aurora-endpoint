@@ -25,9 +25,13 @@ async def lifespan(app: FastAPI):
     http_client = httpx.AsyncClient(timeout=timeout)
 
     messages_client = MessagesApiClient(http_client=http_client, settings=settings)
-    cache_service = MessageCacheService(settings=settings, messages_client=messages_client)
-    retrieval_service = RetrievalService()
     llm_client = OpenRouterClient(http_client=http_client, settings=settings)
+    cache_service = MessageCacheService(
+        settings=settings,
+        messages_client=messages_client,
+        llm_client=llm_client,
+    )
+    retrieval_service = RetrievalService()
     qa_service = QAService(
         cache_service=cache_service,
         retrieval_service=retrieval_service,
